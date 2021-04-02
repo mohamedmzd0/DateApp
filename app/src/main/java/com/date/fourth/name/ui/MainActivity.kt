@@ -285,8 +285,7 @@ class MainActivity : AppCompatActivity() {
             failingUrl: String
         ) {
 
-            Toast.makeText(applicationContext, "Failed loading app!", Toast.LENGTH_SHORT)
-                .show()
+  
         }
     }
 
