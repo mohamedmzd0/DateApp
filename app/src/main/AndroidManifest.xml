@@ -1,34 +1,61 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     package="com.date.fourth.name">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
 
     <application
-        android:allowBackup="true"
+        android:name=".Application"
         android:icon="@drawable/logo"
         android:label="@string/app_name"
+        android:fullBackupContent="true"
         android:roundIcon="@drawable/logo"
         android:hardwareAccelerated="true"
         android:largeHeap="true"
         android:supportsRtl="true"
-        android:theme="@style/Theme.DateApp">
+        android:theme="@style/Theme.DateApp"
+        tools:ignore="AllowBackup"
+        tools:replace="android:fullBackupContent">
+
+        <receiver
+            android:name="com.appsflyer.MultipleInstallBroadcastReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.android.vending.INSTALL_REFERRER" />
+            </intent-filter>
+        </receiver>
         <activity
-            android:name=".ui.SplashActivity"
+            android:exported="true"
+            android:name=".ui.MainActivity"
             android:configChanges="orientation|uiMode|touchscreen|smallestScreenSize|screenLayout|keyboard|mnc|mcc|locale|layoutDirection|fontScale|keyboardHidden|navigation|colorMode|density|screenSize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
                 <category android:name="android.intent.category.LAUNCHER" />
+
+
             </intent-filter>
         </activity>
-        <activity
-            android:name=".ui.MainActivity"
-            android:configChanges="orientation|uiMode|touchscreen|smallestScreenSize|screenLayout|keyboard|mnc|mcc|locale|layoutDirection|fontScale|keyboardHidden|navigation|colorMode|density|screenSize">
 
-        </activity>
+        <service
+            android:name=".MyFirebaseMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/logo" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/purple_500" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="@string/default_notification_channel_id" />
     </application>
 
 </manifest>

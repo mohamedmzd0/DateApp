@@ -11,26 +11,30 @@ import android.os.*
 import android.provider.MediaStore
 import android.util.Log
 import android.view.View
+import android.view.WindowManager
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.ProgressBar
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
+import com.appsflyer.AppsFlyerConversionListener
+import com.appsflyer.AppsFlyerLib
 import com.date.fourth.name.Constants
 import com.date.fourth.name.R
-import com.date.fourth.name.helper.MessageHelper
 import com.example.cacso.helper.SharedHelper
 import com.google.android.material.button.MaterialButton
 import com.sasco.user.helper.NetworkConnectionHelper
 import java.io.File
 import java.io.IOException
-import java.lang.Exception
 import java.text.SimpleDateFormat
 import java.util.*
 
+private const val TAG = "MainActivity"
 
 class MainActivity : AppCompatActivity() {
     private val FCR = 1
@@ -39,24 +43,61 @@ class MainActivity : AppCompatActivity() {
     private var mUMA: ValueCallback<Array<Uri>>? = null
     lateinit var webView: WebView
     lateinit var noConnection: ImageView
+    lateinit var spLogo: ImageView
+    lateinit var spBk: FrameLayout
     lateinit var buttonRetry: MaterialButton
     lateinit var broadcastReceiver: InternetMonitorBroadcast
     lateinit var progress: ProgressBar
+    lateinit var handler: Handler
+    lateinit var runnable: Runnable
+    private val SPLASH_TIME: Long = 2000
+    private var UID: String? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.setFlags(
+            WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
+        )
         setContentView(R.layout.activity_main)
-
+        animateUI()
         initialComponents()
+        if (SharedHelper.getString(this@MainActivity, SharedHelper.LAST_LINK).isNullOrEmpty())
+            initialAppsFlyer()
+        else
+            initialWebView(SharedHelper.getString(this, SharedHelper.LAST_LINK).toString())
+
+    }
+
+    private fun animateUI() {
+
+        spLogo = findViewById<ImageView>(R.id.spLogo)
+        spBk = findViewById<FrameLayout>(R.id.spBk)
+
+        spLogo.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(1000)
+            .setStartDelay(1000).start()
+        handler = Handler(Looper.myLooper()!!)
+        runnable = Runnable {
+            if (UID != null || !SharedHelper.getString(this@MainActivity,SharedHelper.LAST_LINK).isNullOrEmpty()) {
+                spLogo.visibility = View.GONE
+                spBk.visibility = View.GONE
+            }
+        }
+        handler.postDelayed(runnable, SPLASH_TIME)
+
+    }
+
+    private fun initialWebView(url: String) {
+        Log.d(TAG, "initialWebView: " + url)
+        SharedHelper.saveString(this@MainActivity, SharedHelper.LAST_LINK, url)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             webView.settings.safeBrowsingEnabled = true
         }
         webView.settings.mediaPlaybackRequiresUserGesture = false
-
         webView.settings.javaScriptCanOpenWindowsAutomatically = false
         webView.settings.allowFileAccess = true
         webView.settings.allowFileAccessFromFileURLs = true
         webView.settings.allowUniversalAccessFromFileURLs = true
-
         webView.settings.allowContentAccess = true
         webView.webViewClient = WebViewClient()
 
@@ -68,9 +109,6 @@ class MainActivity : AppCompatActivity() {
                 return true
             }
         }
-
-        webView.loadUrl(SharedHelper.getString(this, SharedHelper.LAST_LINK).toString())
-
 
         if (Build.VERSION.SDK_INT >= 21) {
             webView.settings.mixedContentMode = 0
@@ -137,21 +175,84 @@ class MainActivity : AppCompatActivity() {
                 contentSelectionIntent.addCategory(Intent.CATEGORY_OPENABLE)
                 contentSelectionIntent.type = "*/*"
 
-
-//                val intentArray: Array<Intent>
-//                intentArray = takePictureIntent?.let { arrayOf(it) } ?: arrayOfNulls<Intent>(0)
                 val chooserIntent = Intent(Intent.ACTION_CHOOSER)
                 chooserIntent.putExtra(Intent.EXTRA_INTENT, contentSelectionIntent)
                 chooserIntent.putExtra(Intent.EXTRA_TITLE, "Choose an Action")
-//                chooserIntent.putExtra(Intent.EXTRA_INITIAL_INTENTS, intentArray)
                 startActivityForResult(chooserIntent, FCR)
                 return true
             }
         }
+        webView.loadUrl(url.trim())
+
+    }
+
+    private fun initialAppsFlyer() {
+        Log.d(TAG, "initialAppsFlyer: ")
+        AppsFlyerLib.getInstance()
+            .init(Constants.APPS_FLYER_ID, object : AppsFlyerConversionListener {
+                override fun onConversionDataSuccess(data: MutableMap<String, Any>?) {
+
+                    UID = AppsFlyerLib.getInstance().getAppsFlyerUID(this@MainActivity)
+                    Log.d(
+                        TAG,
+                        "onConversionDataSuccess: " + data.toString()
+                    )
+
+                    data?.let {
+
+                        val af_status = it.get("af_status") as String
+                        Log.d(TAG, "onConversionDataSuccess: af_staus $af_status")
+                        runOnUiThread {
+                            if (spLogo.visibility != View.GONE) {
+                                spLogo.visibility = View.GONE
+                                spBk.visibility = View.GONE
+                            }
+                            if (af_status.trim().toLowerCase().contentEquals("organic")) {
+                                Log.d(TAG, "onConversionDataSuccess: equal ")
+                                initialWebView(
+                                    Constants.BASE_URL + AppsFlyerLib.getInstance()
+                                        .getAppsFlyerUID(this@MainActivity) +
+                                            "&source=Organic&campaign=Organic&adset=Organic"
+                                )
+                            } else {
+                                Log.d(TAG, "onConversionDataSuccess: not equal")
+
+                                initialWebView(
+                                    Constants.BASE_URL + AppsFlyerLib.getInstance()
+                                        .getAppsFlyerUID(this@MainActivity) +
+                                            "&campaign=${it.get("campaign")}&adset=${it.get(
+                                                "adset"
+                                            )}"
+                                )
+                            }
+                        }
+                    }
+                    AppsFlyerLib.getInstance().stop(true,this@MainActivity)
+
+                }
+
+                override fun onConversionDataFail(error: String?) {
+                    Log.e(TAG, "error onAttributionFailure :  $error")
+                }
+
+                override fun onAppOpenAttribution(data: MutableMap<String, String>?) {
+                    Log.d(TAG, "onAppOpenAttribution: ")
+                    Log.d(TAG, "onAppOpenAttribution: " + data?.toString())
+                    data?.map {
+                        Log.d(TAG, "onAppOpen_attribute: ${it.key} = ${it.value}")
+                    }
+                }
+
+                override fun onAttributionFailure(error: String?) {
+                    Log.e(TAG, "error onAttributionFailure :  $error")
+                }
+            }, this)
+        AppsFlyerLib.getInstance().start(this)
 
     }
 
     private fun initialComponents() {
+        Log.d(TAG, "initialComponents: ")
         broadcastReceiver = InternetMonitorBroadcast()
         registerReceiver(broadcastReceiver, IntentFilter("android.net.conn.CONNECTIVITY_CHANGE"))
         webView = findViewById<WebView>(R.id.webView)
@@ -176,7 +277,7 @@ class MainActivity : AppCompatActivity() {
     }
 
 
-    class Callback : WebViewClient() {
+    inner class Callback : WebViewClient() {
         override fun onReceivedError(
             view: WebView,
             errorCode: Int,
@@ -184,8 +285,8 @@ class MainActivity : AppCompatActivity() {
             failingUrl: String
         ) {
 
-//            Toast.makeText(contxt, "Failed loading app!", Toast.LENGTH_SHORT)
-//                .show()
+            Toast.makeText(applicationContext, "Failed loading app!", Toast.LENGTH_SHORT)
+                .show()
         }
     }
 
@@ -226,24 +327,10 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    var doubleBackToExitPressedOnce = false
 
     override fun onBackPressed() {
         if (webView.canGoBack())
             webView.goBack()
-        else {
-            if (doubleBackToExitPressedOnce) {
-                finish()
-                return
-            }
-
-            doubleBackToExitPressedOnce = true
-            MessageHelper.toast(this, resources.getString(R.string.double_tab_exit))
-            Handler(Looper.myLooper()!!).postDelayed(
-                { doubleBackToExitPressedOnce = false },
-                2000
-            )
-        }
     }
 
     override fun onDestroy() {
@@ -257,7 +344,10 @@ class MainActivity : AppCompatActivity() {
 
     inner class InternetMonitorBroadcast : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            webView.reload()
+            if (UID == null && SharedHelper.getString(this@MainActivity,SharedHelper.LAST_LINK).isNullOrEmpty())
+                initialAppsFlyer()
+            else
+                webView.reload()
 
         }
 

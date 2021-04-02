@@ -28,7 +28,7 @@ class SharedHelper {
 
 
         public fun getString(context: Context, key: String): String? {
-            return getSharedPref(context)?.getString(key, Constants.URL)
+            return getSharedPref(context)?.getString(key, null)
         }
 
         public fun getBoolean(context: Context, key: String): Boolean? {

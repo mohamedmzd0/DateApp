@@ -1,0 +1,85 @@
+{
+  "project_info": {
+    "project_number": "622906875934",
+    "firebase_url": "https://dailyquran-team.firebaseio.com",
+    "project_id": "dailyquran-team",
+    "storage_bucket": "dailyquran-team.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:622906875934:android:6556a516fed22c13bbce0f",
+        "android_client_info": {
+          "package_name": "com.date.fourth.name"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "622906875934-ic9phc5016kufbo8j3p5vpdr4f87tfb7.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAu95IWb6VnINsEMjS3SOMm7bYaUXBmGBo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "622906875934-ic9phc5016kufbo8j3p5vpdr4f87tfb7.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:622906875934:android:60a5053074315362bbce0f",
+        "android_client_info": {
+          "package_name": "com.mohamedabdelaziz.dailyquran"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "622906875934-cqa3a92kbg2qkgapa39n8021ofnqd9he.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.mohamedabdelaziz.dailyquran",
+            "certificate_hash": "9ed99676a3de30a578d549b0337cf5db6c6f5b15"
+          }
+        },
+        {
+          "client_id": "622906875934-hsd8v0gn3dli4ljirplvf1341qg8nrik.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.mohamedabdelaziz.dailyquran",
+            "certificate_hash": "377947ad145ae012bd0f45169953536e78883ce5"
+          }
+        },
+        {
+          "client_id": "622906875934-ic9phc5016kufbo8j3p5vpdr4f87tfb7.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAu95IWb6VnINsEMjS3SOMm7bYaUXBmGBo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "622906875934-ic9phc5016kufbo8j3p5vpdr4f87tfb7.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
