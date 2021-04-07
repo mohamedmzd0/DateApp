@@ -1,26 +1,27 @@
 package com.date.fourth.name.ui
 
-import android.annotation.SuppressLint
+import android.Manifest
+import android.annotation.TargetApi
 import android.app.Activity
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.*
 import android.provider.MediaStore
 import android.util.Log
 import android.view.View
 import android.view.WindowManager
-import android.webkit.ValueCallback
-import android.webkit.WebChromeClient
-import android.webkit.WebView
-import android.webkit.WebViewClient
+import android.webkit.*
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.ProgressBar
 import android.widget.Toast
+import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import com.appsflyer.AppsFlyerConversionListener
 import com.appsflyer.AppsFlyerLib
@@ -52,15 +53,16 @@ class MainActivity : AppCompatActivity() {
     lateinit var runnable: Runnable
     private val SPLASH_TIME: Long = 2000
     private var UID: String? = null
+    val INPUT_FILE_REQUEST_CODE = 1
+    private var mFilePathCallback: ValueCallback<Array<Uri?>?>? = null
+    private var mCameraPhotoPath: String? = null
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.setFlags(
-            WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
-            WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
-        )
         setContentView(R.layout.activity_main)
         animateUI()
+
         initialComponents()
         if (SharedHelper.getString(this@MainActivity, SharedHelper.LAST_LINK).isNullOrEmpty())
             initialAppsFlyer()
@@ -78,7 +80,9 @@ class MainActivity : AppCompatActivity() {
             .setStartDelay(1000).start()
         handler = Handler(Looper.myLooper()!!)
         runnable = Runnable {
-            if (UID != null || !SharedHelper.getString(this@MainActivity,SharedHelper.LAST_LINK).isNullOrEmpty()) {
+            if (UID != null || !SharedHelper.getString(this@MainActivity, SharedHelper.LAST_LINK)
+                    .isNullOrEmpty()
+            ) {
                 spLogo.visibility = View.GONE
                 spBk.visibility = View.GONE
             }
@@ -88,106 +92,39 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun initialWebView(url: String) {
-        Log.d(TAG, "initialWebView: " + url)
         SharedHelper.saveString(this@MainActivity, SharedHelper.LAST_LINK, url)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             webView.settings.safeBrowsingEnabled = true
         }
-        webView.settings.mediaPlaybackRequiresUserGesture = false
-        webView.settings.javaScriptCanOpenWindowsAutomatically = false
-        webView.settings.allowFileAccess = true
-        webView.settings.allowFileAccessFromFileURLs = true
-        webView.settings.allowUniversalAccessFromFileURLs = true
-        webView.settings.allowContentAccess = true
-        webView.webViewClient = WebViewClient()
-
-        webView.webViewClient = object : WebViewClient() {
-            override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
-                if (url != null) {
-                    view?.loadUrl(url)
-                }
-                return true
-            }
-        }
-
-        if (Build.VERSION.SDK_INT >= 21) {
-            webView.settings.mixedContentMode = 0
-            webView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
-        } else
-            webView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
-        webView.webViewClient = Callback()
-
-        noConnection.isVisible = !NetworkConnectionHelper.isNetworkConnected(this@MainActivity)
-        buttonRetry.isVisible = !NetworkConnectionHelper.isNetworkConnected(this@MainActivity)
-
-        webView.webChromeClient = object : WebChromeClient() {
-            override fun onProgressChanged(view: WebView?, newProgress: Int) {
-                super.onProgressChanged(view, newProgress)
-                progress.progress = newProgress
-                if (newProgress >= 90)
-                    progress.visibility = View.GONE
-                else progress.visibility = View.VISIBLE
-
-                SharedHelper.saveString(
-                    this@MainActivity,
-                    SharedHelper.LAST_LINK,
-                    webView.url.toString()
-                )
-                if (newProgress > 95) {
-                    buttonRetry.isVisible =
-                        !NetworkConnectionHelper.isNetworkConnected(this@MainActivity)
-                    noConnection.isVisible =
-                        !NetworkConnectionHelper.isNetworkConnected(this@MainActivity)
-                }
-            }
 
 
-            override fun onShowFileChooser(
-                webView: WebView, filePathCallback: ValueCallback<Array<Uri>>,
-                fileChooserParams: FileChooserParams
+        webView.settings.setJavaScriptEnabled(true)
+        webView.settings.setUseWideViewPort(true)
+        webView.settings.setDomStorageEnabled(true)
+        webView.settings.setMediaPlaybackRequiresUserGesture(false)
+        setUpWebViewDefaults(webView)
+        webView.setWebChromeClient(MyWebChromeClient())
+        webView.setWebViewClient(object : WebViewClient() {
+            override fun shouldOverrideUrlLoading(
+                webview: WebView,
+                url: String?
             ): Boolean {
-                if (mUMA != null) {
-                    mUMA!!.onReceiveValue(null)
-                }
-                mUMA = filePathCallback
-                var takePictureIntent: Intent? = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
-                if (getPackageManager()
-                        ?.let { takePictureIntent!!.resolveActivity(it) } != null
-                ) {
-                    var photoFile: File? = null
-                    try {
-                        photoFile = createImageFile()
-                        takePictureIntent?.putExtra("PhotoPath", mCM)
-                    } catch (ex: IOException) {
-                        Log.e("TAG", "Image file creation failed", ex)
-                    }
-                    if (photoFile != null) {
-                        mCM = "file:" + photoFile.getAbsolutePath()
-                        takePictureIntent?.putExtra(
-                            MediaStore.EXTRA_OUTPUT,
-                            Uri.fromFile(photoFile)
-                        )
-                    } else {
-                        takePictureIntent = null
-                    }
-                }
-                val contentSelectionIntent = Intent(Intent.ACTION_GET_CONTENT)
-                contentSelectionIntent.addCategory(Intent.CATEGORY_OPENABLE)
-                contentSelectionIntent.type = "*/*"
-
-                val chooserIntent = Intent(Intent.ACTION_CHOOSER)
-                chooserIntent.putExtra(Intent.EXTRA_INTENT, contentSelectionIntent)
-                chooserIntent.putExtra(Intent.EXTRA_TITLE, "Choose an Action")
-                startActivityForResult(chooserIntent, FCR)
+                webview.loadUrl(url!!)
                 return true
             }
-        }
-        webView.loadUrl(url.trim())
+
+            override fun onPageFinished(view: WebView?, url: String?) {
+                super.onPageFinished(view, url)
+            }
+        })
+        // Load the local index.html file
+
+        // Load the local index.html file
+        webView.loadUrl(url)
 
     }
 
     private fun initialAppsFlyer() {
-        Log.d(TAG, "initialAppsFlyer: ")
         AppsFlyerLib.getInstance()
             .init(Constants.APPS_FLYER_ID, object : AppsFlyerConversionListener {
                 override fun onConversionDataSuccess(data: MutableMap<String, Any>?) {
@@ -212,7 +149,7 @@ class MainActivity : AppCompatActivity() {
                                 initialWebView(
                                     Constants.BASE_URL + AppsFlyerLib.getInstance()
                                         .getAppsFlyerUID(this@MainActivity) +
-                                            "&source=Organic&campaign=Organic&adset=Organic"
+                                            "&source=organic&campaign=organic&adset=organic"
                                 )
                             } else {
                                 Log.d(TAG, "onConversionDataSuccess: not equal")
@@ -220,14 +157,14 @@ class MainActivity : AppCompatActivity() {
                                 initialWebView(
                                     Constants.BASE_URL + AppsFlyerLib.getInstance()
                                         .getAppsFlyerUID(this@MainActivity) +
-                                            "&campaign=${it.get("campaign")}&adset=${it.get(
+                                            "&source=${it.get("source")}&campaign=${it.get("campaign")}&adset=${it.get(
                                                 "adset"
                                             )}"
                                 )
                             }
                         }
                     }
-                    AppsFlyerLib.getInstance().stop(true,this@MainActivity)
+                    AppsFlyerLib.getInstance().stop(true, this@MainActivity)
 
                 }
 
@@ -266,66 +203,6 @@ class MainActivity : AppCompatActivity() {
 
     }
 
-    @Throws(IOException::class)
-    private fun createImageFile(): File? {
-        @SuppressLint("SimpleDateFormat") val timeStamp: String =
-            SimpleDateFormat("yyyyMMdd_HHmmss").format(Date())
-        val imageFileName = "img_" + timeStamp + "_"
-        val storageDir: File =
-            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
-        return File.createTempFile(imageFileName, ".jpg", storageDir)
-    }
-
-
-    inner class Callback : WebViewClient() {
-        override fun onReceivedError(
-            view: WebView,
-            errorCode: Int,
-            description: String,
-            failingUrl: String
-        ) {
-
-  
-        }
-    }
-
-
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (Build.VERSION.SDK_INT >= 21) {
-            var results: Array<*>? = null
-            //Check if response is positive
-            if (resultCode == Activity.RESULT_OK) {
-                if (requestCode == FCR) {
-                    if (null == mUMA) {
-                        return
-                    }
-                    if (intent == null) {
-                        //Capture Photo if no image available
-                        if (mCM != null) {
-                            results = arrayOf(Uri.parse(mCM))
-                        }
-                    } else {
-                        val dataString = intent.dataString
-                        if (dataString != null) {
-                            results = arrayOf(Uri.parse(dataString))
-                        }
-                    }
-                }
-            }
-            mUMA?.onReceiveValue(results as Array<Uri>?)
-            mUMA = null
-        } else {
-            if (requestCode == FCR) {
-                if (null == mUM) return
-                val result =
-                    if (intent == null || resultCode != Activity.RESULT_OK) null else intent.data
-                mUM!!.onReceiveValue(result)
-                mUM = null
-            }
-        }
-    }
-
 
     override fun onBackPressed() {
         if (webView.canGoBack())
@@ -343,12 +220,192 @@ class MainActivity : AppCompatActivity() {
 
     inner class InternetMonitorBroadcast : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            if (UID == null && SharedHelper.getString(this@MainActivity,SharedHelper.LAST_LINK).isNullOrEmpty())
+            if (UID == null && SharedHelper.getString(this@MainActivity, SharedHelper.LAST_LINK)
+                    .isNullOrEmpty()
+            )
                 initialAppsFlyer()
             else
                 webView.reload()
 
         }
 
+    }
+
+
+    fun createImageFile(): File? {
+        val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss").format(Date())
+        val imageFileName = "JPEG_" + timeStamp + "_"
+        val storageDir = Environment.getExternalStoragePublicDirectory(
+            Environment.DIRECTORY_PICTURES
+        )
+        return File.createTempFile(
+            imageFileName,
+            ".jpg",
+            storageDir
+        )
+    }
+
+
+    @TargetApi(Build.VERSION_CODES.HONEYCOMB)
+    private fun setUpWebViewDefaults(webView: WebView) {
+        val settings: WebSettings = webView.settings
+
+        // Enable Javascript
+        settings.setJavaScriptEnabled(true)
+
+        // Use WideViewport and Zoom out if there is no viewport defined
+        settings.setUseWideViewPort(true)
+        settings.setLoadWithOverviewMode(true)
+
+        settings.setBuiltInZoomControls(true)
+        if (Build.VERSION.SDK_INT > Build.VERSION_CODES.HONEYCOMB) {
+            settings.setDisplayZoomControls(false)
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+            WebView.setWebContentsDebuggingEnabled(true)
+        }
+
+        webView.setWebViewClient(WebViewClient())
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        if (requestCode != INPUT_FILE_REQUEST_CODE || mFilePathCallback == null) {
+            super.onActivityResult(requestCode, resultCode, data)
+            return
+        }
+        var results: Array<Uri?>? = null
+
+        // Check that the response is a good one
+        if (resultCode == Activity.RESULT_OK) {
+            if (data == null) {
+                // If there is not data, then we may have taken a photo
+                if (mCameraPhotoPath != null) {
+                    results = arrayOf(Uri.parse(mCameraPhotoPath))
+                }
+            } else {
+                val dataString = data.dataString
+                if (dataString != null) {
+                    results = arrayOf(Uri.parse(dataString))
+                }
+            }
+        }
+        mFilePathCallback?.onReceiveValue(results)
+        mFilePathCallback = null
+        return
+    }
+
+
+    inner class MyWebChromeClient : WebChromeClient() {
+        @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
+        override fun onPermissionRequest(request: PermissionRequest) {
+            val requestedResources: Array<String> = request.getResources()
+            for (r in requestedResources) {
+                if (r == PermissionRequest.RESOURCE_VIDEO_CAPTURE) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        if (ContextCompat.checkSelfPermission(
+                                this@MainActivity, Manifest.permission.CAMERA
+                            ) ==
+                            PackageManager.PERMISSION_GRANTED
+                            &&
+                            ContextCompat.checkSelfPermission(
+                                this@MainActivity, Manifest.permission.RECORD_AUDIO
+                            ) ==
+                            PackageManager.PERMISSION_GRANTED
+                        ) {
+
+                            request.grant(
+                                arrayOf<String>(
+                                    PermissionRequest.RESOURCE_VIDEO_CAPTURE,
+                                    PermissionRequest.RESOURCE_AUDIO_CAPTURE
+                                )
+                            )
+                        } else
+
+                            requestPermissions(
+                                arrayOf<String>(
+                                    Manifest.permission.CAMERA,
+                                    Manifest.permission.RECORD_AUDIO
+                                ), 456
+                            )
+                    }
+                    break
+                }
+            }
+        }
+
+        override fun onProgressChanged(view: WebView?, newProgress: Int) {
+
+            if (newProgress >= 90)
+                progress.visibility = View.GONE
+            else progress.visibility = View.VISIBLE
+
+            SharedHelper.saveString(
+                this@MainActivity,
+                SharedHelper.LAST_LINK,
+                webView.url.toString()
+            )
+            if (newProgress > 95) {
+                buttonRetry.isVisible =
+                    !NetworkConnectionHelper.isNetworkConnected(this@MainActivity)
+                noConnection.isVisible =
+                    !NetworkConnectionHelper.isNetworkConnected(this@MainActivity)
+            }
+        }
+
+        override fun onShowFileChooser(
+            webView: WebView, filePathCallback: ValueCallback<Array<Uri>>,
+            fileChooserParams: FileChooserParams
+        ): Boolean {
+            if (mUMA != null) {
+                mUMA!!.onReceiveValue(null)
+            }
+            mUMA = filePathCallback
+            var takePictureIntent: Intent? = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
+            if (getPackageManager()
+                    ?.let { takePictureIntent!!.resolveActivity(it) } != null
+            ) {
+                var photoFile: File? = null
+                try {
+                    photoFile = createImageFile()
+                    takePictureIntent?.putExtra("PhotoPath", mCM)
+                } catch (ex: IOException) {
+                    Log.e("TAG", "Image file creation failed", ex)
+                }
+                if (photoFile != null) {
+                    mCM = "file:" + photoFile.getAbsolutePath()
+                    takePictureIntent?.putExtra(
+                        MediaStore.EXTRA_OUTPUT,
+                        Uri.fromFile(photoFile)
+                    )
+                } else {
+                    takePictureIntent = null
+                }
+            }
+            val contentSelectionIntent = Intent(Intent.ACTION_GET_CONTENT)
+            contentSelectionIntent.addCategory(Intent.CATEGORY_OPENABLE)
+            contentSelectionIntent.type = "*/*"
+
+            val chooserIntent = Intent(Intent.ACTION_CHOOSER)
+            chooserIntent.putExtra(Intent.EXTRA_INTENT, contentSelectionIntent)
+            chooserIntent.putExtra(Intent.EXTRA_TITLE, "Choose an Action")
+            startActivityForResult(chooserIntent, FCR)
+            return true
+        }
+
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == 456 && grantResults.isNotEmpty()) {
+            webView.setWebChromeClient(MyWebChromeClient())
+            webView.reload()
+
+        }
     }
 }
